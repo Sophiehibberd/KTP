@@ -100,7 +100,6 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
         ui.input_password("reg_password", "Password")
         ui.input_text("reg_key", "Product key")
         ui.input_action_button("reg_btn", "Create & Activate")
-        U.output_text("reg_status")
 
         ui.hr()
 
@@ -109,7 +108,6 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
         ui.input_text("login_email", "Email")
         ui.input_password("login_password", "Password")
         ui.input_action_button("login_btn", "Sign in")
-        U.output_text("login_status")
 
         # ------ Handlers ------
 
@@ -191,8 +189,6 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
     # ===== TRAINING =====
     with ui.nav_panel("Training", value="Training"):
         ui.h3("Training Documents and Instructional Videos")
-        U.output_ui("pdf_list")
-        U.output_ui("video_embeds")
 
         @render.ui
         def pdf_list():
@@ -226,14 +222,9 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
         ui.h3("Test Results Upload")
 
         ui.input_file("tbl", "Upload CSV (Document must be in CSV format and contain 6 columns)", accept=[".csv"], multiple=False)
-        U.download_button("dl_template", "Download Template")
+        
 
-        U.output_text("validation_msg")
-        U.output_data_frame("preview_df")
-        ui.input_action_button("confirm", "Confirm Upload")
-        U.output_text("upload_status")
-
-        @render.download(filename=lambda: f"template_{time.strftime('%Y%m%d')}.csv")
+        @render.download(filename=lambda: f"template_{time.strftime('%Y%m%d')}.csv", label="Download CSV Template")
         def dl_template():
             try:
                 b = download_file(DRIVE_ID, "NBFKTPAPP/Admin/upload_template.csv")
@@ -273,7 +264,7 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
             df = parsed_df()
             if df.empty:
                 return "Awaiting upload…"
-            if df.shape[1] != 13:
+            if df.shape[1] != 6:
                 return f"❌ Expected 6 columns, got {df.shape[1]}."
             if df.shape[0] < 1:
                 return "❌ No data rows."
@@ -283,6 +274,8 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
         def preview_df():
             df = parsed_df()
             return df.head(25) if not df.empty else pd.DataFrame({"Status": ["No preview available"]})
+
+        ui.input_action_button("confirm", "Confirm Upload")
 
         @render.text
         @reactive.event(input.confirm)
@@ -335,8 +328,6 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
         ui.input_numeric("num_ym", "Yeast & Mould (YM)", value=0)
         ui.input_numeric("num_tc", "Total Viable Count (TVC)", value=0)
 
-        U.output_text("decision_result")
-
         @render.text
         def decision_result():
             try:
@@ -355,15 +346,6 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
     with ui.nav_panel("My results", value="My results"):
         ui.h3("My uploaded results and trends")
         ui.p("View your data and trends over time.")
-
-        # Server-rendered selects (so they update based on uploaded CSVs)
-        U.output_ui("metric_select")
-        U.output_ui("rowid_select")   # choose which column acts as row identifier (e.g. Product, Sample)
-        U.output_ui("rowval_select")  # choose the specific row-name/value to trace over time
-
-        U.output_text("results_msg")
-        U.output_plot("results_plot")
-        U.output_data_frame("results_table")
 
         # Reactive: load & combine the user's uploaded CSVs from OneDrive
         @reactive.calc
@@ -436,6 +418,7 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
 
             return big
 
+        # Server-rendered selects (so they update based on uploaded CSVs)
         @render.ui
         def metric_select():
             df = my_uploads_df()
@@ -447,43 +430,42 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
                 choices = numeric_cols or ["(no numeric columns)"]
             return ui.input_select("metric", "Select metric to plot", choices=choices)
 
-        @render.ui
-        def rowid_select():
-            # let user select which column should be treated as the "row name" / identifier
-            df = my_uploads_df()
-            if df.empty:
-                choices = ["(no identifier columns)"]
-            else:
-                exclude = {"_uploaded_filename", "_upload_time", "_upload_time_dt"}
-                # treat non-numeric columns as candidate identifiers
-                id_cols = [c for c in df.columns if c not in exclude and not pd.api.types.is_numeric_dtype(df[c])]
-                choices = id_cols or ["(no identifier columns)"]
-            return ui.input_select("rowid", "Select row identifier column", choices=choices)
+        
 
         @render.ui
         def rowval_select():
-            # choices depend on selected rowid
+             # Get unique values from the first non-numeric column found
             df = my_uploads_df()
-            rid = input.rowid() or ""
-            if df.empty or not rid or rid in {"(no identifier columns)", "(no numeric columns)"} or rid not in df.columns:
-                return ui.input_select("rowval", "Select row value", choices=["(no values)"])
-            # gather unique values (as strings) across uploads
+            if df.empty:
+                return ui.input_select("rowval", "Sample Identifier", choices=["(no values)"])
+    
+            # Find the first non-numeric column to use as identifier
+            exclude = {"_uploaded_filename", "_upload_time", "_upload_time_dt"}
+            id_cols = [c for c in df.columns if c not in exclude and not pd.api.types.is_numeric_dtype(df[c])]
+    
+            if not id_cols:
+                return ui.input_select("rowval", "Sample Identifier", choices=["(no values)"])
+    
+            # Use the first identifier column
+            rid = id_cols[0]
             try:
                 vals = df[rid].dropna().astype(str).unique().tolist()
                 vals = sorted(vals)
             except Exception as ex:
                 print("MY RESULTS: failed to compute row values for", rid, ex)
                 vals = []
+    
             if not vals:
                 vals = ["(no values)"]
-            return ui.input_select("rowval", "Select row value", choices=vals, selected=vals[0])
+            return ui.input_select("rowval", "Sample Identifier", choices=vals, selected=vals[0] if vals and vals[0] != "(no values)" else "(no values)")
+       
 
         @render.text
         def results_msg():
             df = my_uploads_df()
             if df.empty:
                 return "No uploads found for your account."
-            return f"Loaded {len(df)} rows from your uploads. Choose a metric and a row-name to plot."
+            return f"Loaded {len(df)} rows from your uploads. Choose a metric and a Sample Identifier to plot."
 
         @render.plot
         def results_plot():
@@ -495,10 +477,21 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
                 return fig
 
             metric = input.metric()
-            rowid = input.rowid() or ""
             rowval = input.rowval() or ""
 
-            # prepare plotting columns
+    # Find the first non-numeric column to use as identifier
+            exclude = {"_uploaded_filename", "_upload_time", "_upload_time_dt"}
+            id_cols = [c for c in df.columns if c not in exclude and not pd.api.types.is_numeric_dtype(df[c])]
+    
+            if not id_cols:
+                fig, ax = plt.subplots()
+                ax.text(0.5, 0.5, "No identifier columns found", ha="center", va="center")
+                ax.set_axis_off()
+                return fig
+    
+            rid = id_cols[0]
+
+    # prepare plotting columns
             if not metric or metric == "(no numeric columns)":
                 numeric_cols = [c for c in df.columns if c not in {"_uploaded_filename", "_upload_time", "_upload_time_dt"} and pd.api.types.is_numeric_dtype(df[c])]
                 plot_cols = numeric_cols
@@ -511,19 +504,19 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
                 ax.set_axis_off()
                 return fig
 
-            # apply row-name filtering if both selected and valid
+    # apply row-name filtering if both selected and valid
             df_plot = df
-            if rowid and rowid not in {"(no identifier columns)", "(no numeric columns)"} and rowid in df.columns and rowval and rowval != "(no values)":
-                # compare as strings to avoid dtype issues
-                df_plot = df_plot[df_plot[rowid].astype(str) == str(rowval)]
+            if rid and rid in df.columns and rowval and rowval != "(no values)":
+        # compare as strings to avoid dtype issues
+                df_plot = df_plot[df_plot[rid].astype(str) == str(rowval)]
 
             if df_plot.empty:
                 fig, ax = plt.subplots()
-                ax.text(0.5, 0.5, "No matching rows for selected row-name / value", ha="center", va="center")
+                ax.text(0.5, 0.5, "No matching rows for selected Sample Identifier", ha="center", va="center")
                 ax.set_axis_off()
                 return fig
 
-            # choose time axis: prefer Date column if it's datetime-like, else use upload time
+    # choose time axis: prefer Date column if it's datetime-like, else use upload time
             if 'Date' in df_plot.columns and pd.api.types.is_datetime64_any_dtype(df_plot['Date']):
                 time_col = 'Date'
                 times = pd.to_datetime(df_plot[time_col], errors="coerce")
@@ -551,12 +544,22 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
             df = my_uploads_df()
             if df.empty:
                 return pd.DataFrame({"Status": ["No uploads found"]})
-            rowid = input.rowid() or ""
+    
             rowval = input.rowval() or ""
+    
+    # Find the first non-numeric column to use as identifier
+            exclude = {"_uploaded_filename", "_upload_time", "_upload_time_dt"}
+            id_cols = [c for c in df.columns if c not in exclude and not pd.api.types.is_numeric_dtype(df[c])]
+    
+            if not id_cols:
+                return df
+    
+            rid = id_cols[0]
             df_show = df
-            if rowid and rowid in df.columns and rowval and rowval != "(no values)":
-                df_show = df_show[df_show[rowid].astype(str) == str(rowval)]
-            # show a few columns plus metadata
+            if rid and rid in df.columns and rowval and rowval != "(no values)":
+                df_show = df_show[df_show[rid].astype(str) == str(rowval)]
+    
+    # show a few columns plus metadata
             cols = [c for c in df_show.columns if not c.startswith("_")][:10]
             meta = ["_uploaded_filename", "_upload_time"]
             display_cols = cols + [c for c in meta if c in df_show.columns]

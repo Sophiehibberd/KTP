@@ -3,3 +3,5 @@ rsconnect-python
 msal
 requests
 pandas
+python-dotenv
+matplotlib

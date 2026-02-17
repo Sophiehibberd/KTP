@@ -6,7 +6,13 @@ venv/
 # Ignore Python caches
 __pycache__/
 *.pyc
+*.pyo 
+*.pyd 
 
 # Ignore OS/editor files
 .DS_Store
 Thumbs.db
+
+# Editor workspaces
+.vscode/
+.idea/
