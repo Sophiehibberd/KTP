@@ -1,0 +1,5 @@
+shiny
+rsconnect-python
+msal
+requests
+pandas
