@@ -1,6 +1,6 @@
 # app.py — extended with "My results" row-name filtering
 from dotenv import load_dotenv
-load_dotenv()
+_=load_dotenv()
 
 # app.py (patched for JSON password storage and Shiny Express)
 import os
@@ -86,7 +86,7 @@ def _on_session_start():
 
 
 # ---------------- PAGE LAYOUT ----------------
-with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
+with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
 
     # ===== ACTIVATION =====
     with ui.nav_panel("Activation", value="Activation"):
@@ -120,7 +120,7 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
                 key   = (input.reg_key() or "").strip()
 
                 #debug attempt
-                print("DEBUG NEW ACCOUNT PASSWORD:", repr(pwd), "len=", len(pwd))
+                #print("DEBUG NEW ACCOUNT PASSWORD:", repr(pwd), "len=", len(pwd))
 
                 if not email or not pwd or not key:
                     return "Please fill all fields."
@@ -314,7 +314,7 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
                     }
                 )
 
-                return f"📤 Uploaded to {dest_path}"
+                return f"✅ Uploaded: {filename}"
 
             except Exception as ex:
                 return f"Upload failed: {ex}"
@@ -322,24 +322,36 @@ with ui.navset_bar(title="NBFKTPAPP", id="main_nav"):
 
     # ===== DECISION TOOL =====
     with ui.nav_panel("Decision Tool", value="Decision Tool"):
-        ui.h3("Three-number Pass/Fail")
+        ui.h3("Decision Tree Calculator")
 
         ui.input_numeric("num_eb", "Enterobacteriaceae (EB)", value=0)
         ui.input_numeric("num_ym", "Yeast & Mould (YM)", value=0)
-        ui.input_numeric("num_tc", "Total Viable Count (TVC)", value=0)
+        ui.input_numeric("num_rac", "Rapid Aerobic Count (RAC)", value=0)
 
-        @render.text
+        @render.ui
         def decision_result():
             try:
                 eb = float(input.num_eb())
                 ym = float(input.num_ym())
-                tc = float(input.num_tc())
-            except:
-                return "Please enter valid numbers."
+                rac = float(input.num_rac())
+            except Exception:
+                return ui.div("Please enter valid numbers.", style="color: #b00020;")
 
             rules = decision_rules()
-            result, explanation = decision_logic.evaluate_triplet([eb, ym, tc], rules)
-            return f"{result}\n{explanation}"
+            result, explanation = decision_logic.evaluate_triplet([eb, ym, rac], rules)
+
+            color_map = {
+                "Green": "#2e7d32",
+                "Amber": "#ff8f00",
+                "Red": "#c62828",
+            }
+            color = color_map.get(str(result), "#333333")
+
+            return ui.div(
+                ui.div(str(result), style=f"color: {color}; font-weight: 700; font-size: 1.2rem;"),
+                ui.div(str(explanation), style="margin-top: 0.25rem; color: #333333;"),
+                style="margin-top: 1rem;",
+            )
 
 
     # ===== MY RESULTS =====
