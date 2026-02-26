@@ -1,6 +1,6 @@
 
  #decision_logic.py
-# JSON-driven rules for the three-number Decision Tool (EB, YM, TC).
+# JSON-driven rules for the three-number Decision Tool (EB, YM, RAC).
 # The engine evaluates rules in order and returns the first matching result.
 
 from typing import Dict, Any, List, Tuple, Optional
@@ -39,13 +39,13 @@ def _match_one(val: Number, cond: Dict[str, Any]) -> bool:
             return False
     return True
 
-def _matches_rule(eb: Number, ym: Number, tc: Number, when: Dict[str, Any]) -> bool:
+def _matches_rule(eb: Number, ym: Number, rac: Number, when: Dict[str, Any]) -> bool:
     """
     'when' is a dict that may contain conditions for 'eb', 'ym', 'tc'.
     Each of those is itself a dict of comparison operators (see _match_one).
     If a key isn't present, it's treated as "no constraint" for that variable.
     """
-    for key, val_cond in (("eb", eb), ("ym", ym), ("tc", tc)):
+    for key, val_cond in (("eb", eb), ("ym", ym), ("rac", rac)):
         cond = when.get(key)
         if cond is not None:
             if not _match_one(val_cond, cond):
@@ -54,13 +54,13 @@ def _matches_rule(eb: Number, ym: Number, tc: Number, when: Dict[str, Any]) -> b
 
 def evaluate_triplet(nums: List[Any], rules_doc: Dict[str, Any] | None) -> Tuple[str, str]:
     """
-    Evaluate the (EB, YM, TC) triple against a rules document loaded from JSON.
+    Evaluate the (EB, YM, RAC) triple against a rules document loaded from JSON.
 
     rules_doc structure:
     {
       "rule_version": "2025-12-10",
       "rules": [
-        {"when": {"eb": {"lt": 1}, "ym": {"lte": 1}, "tc": {"lte": 20}}, "result": "Green"},
+        {"when": {"eb": {"lt": 1}, "ym": {"lte": 1}, "rac": {"lte": 20}}, "result": "Green"},
         ...
       ],
       "default": "Red"
@@ -69,18 +69,18 @@ def evaluate_triplet(nums: List[Any], rules_doc: Dict[str, Any] | None) -> Tuple
     if not isinstance(nums, list) or len(nums) != 3:
         return ("Invalid", "Please provide exactly three numbers.")
 
-    eb, ym, tc = (_get_num(nums[0]), _get_num(nums[1]), _get_num(nums[2]))
-    if eb is None or ym is None or tc is None:
+    eb, ym, rac = (_get_num(nums[0]), _get_num(nums[1]), _get_num(nums[2]))
+    if eb is None or ym is None or rac is None:
         return ("Invalid", "All three values must be numeric (integers/decimals).")
 
-    # If we don't have a valid rules document, fail gracefully with a sensible default
+    # If we don't have a valid rules document, fail with a sensible default
     if not isinstance(rules_doc, dict) or "rules" not in rules_doc:
         return ("Invalid", "Decision rules are not available. Please contact the administrator.")
 
     # Evaluate in order; the first match wins
     for i, rule in enumerate(rules_doc.get("rules", [])):
         when = rule.get("when", {})
-        if _matches_rule(eb, ym, tc, when):
+        if _matches_rule(eb, ym, rac, when):
             label = str(rule.get("result", "Fail"))
             explain = rule.get("explanation") or f"Matched rule #{i+1} ({label})."
             return (label, explain)
