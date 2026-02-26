@@ -38,7 +38,8 @@ DRIVE_ID = os.environ["DRIVE_ID"]
 ADMIN_KEYS_PATH      = "NBFKTPAPP/Admin/product_keys.csv"
 TRAINING_FOLDER      = "NBFKTPAPP/Training"
 TRAINING_VIDEOS_JSON = "NBFKTPAPP/Admin/training_videos.json"
-DECISION_RULES_JSON  = "NBFKTPAPP/Admin/decision_rules.json"
+NATURAL_FIBRES_RULES_JSON   = "NBFKTPAPP/Admin/natural_fibres_decision_rules.json"
+SYNTHETIC_FIBRES_RULES_JSON = "NBFKTPAPP/Admin/synthetic_fibres_decision_rules.json"
 
 EXPECTED_COLUMNS = None
 
@@ -59,8 +60,16 @@ def _sha256_file(path: str) -> str:
 # ---------- Load decision rules (optional JSON config) ----------
 @reactive.calc
 def decision_rules():
-    cfg = read_json(DRIVE_ID, DECISION_RULES_JSON)
-    return cfg or {}
+    # Default to natural if missing (e.g., before UI initializes)
+    choice = input.material_type() if hasattr(input, "material_type") else "natural"
+
+    if choice == "synthetic":
+        path = SYNTHETIC_FIBRES_RULES_JSON
+    else:
+        path = NATURAL_FIBRES_RULES_JSON
+
+    cfg = read_json(DRIVE_ID, path)
+    return cfg or {
 
 
 # ---------- NAVIGATION & SECURITY ----------
@@ -323,6 +332,16 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
     # ===== DECISION TOOL =====
     with ui.nav_panel("Decision Tool", value="Decision Tool"):
         ui.h3("Decision Tree Calculator")
+
+        ui.input_radio_buttons(
+            "material_type",
+            "Select material type",
+            choices={
+                "natural": "Natural or Mixed Fibre Materials",
+                "synthetic": "Synthetic Fibre and Foam Materials",
+            },
+            selected="natural",
+        )
 
         ui.input_numeric("num_eb", "Enterobacteriaceae (EB)", value=0)
         ui.input_numeric("num_ym", "Yeast & Mould (YM)", value=0)
