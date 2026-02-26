@@ -1,7 +1,7 @@
 # accounts.py (FINAL VERSION — JSONL storage, OneDrive-safe)
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=False)
 
 import io
 import time

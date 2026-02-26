@@ -1,6 +1,6 @@
 # app.py — extended with "My results" row-name filtering
 from dotenv import load_dotenv
-_=load_dotenv()
+load_dotenv(override=False)
 
 # app.py (patched for JSON password storage and Shiny Express)
 import os
