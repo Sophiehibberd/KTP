@@ -69,7 +69,7 @@ def decision_rules():
         path = NATURAL_FIBRES_RULES_JSON
 
     cfg = read_json(DRIVE_ID, path)
-    return cfg or {
+    return cfg or {}
 
 
 # ---------- NAVIGATION & SECURITY ----------
