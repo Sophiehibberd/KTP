@@ -347,7 +347,7 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
 
         ui.input_action_button("enter_result", "Enter")
         ui.input_action_button("results_completed", "Results completed")
-        ui.output_text("entry_status")
+        ui.output_ui("entry_status")
 
         ui.hr()
         ui.h4("Results entered this session")
@@ -406,10 +406,10 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
             "entered_at",
         ]))
 
-        @render.text
+        @render.ui
         def entry_status():
             # default blank
-            return ""
+            return ui.div()
 
         @reactive.effect
         @reactive.event(input.enter_result)
