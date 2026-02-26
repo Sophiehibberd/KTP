@@ -50,6 +50,24 @@ def upload_small_file(drive_id: str, dest_path: str, local_path: str) -> dict:
     r.raise_for_status()
     return r.json()
 
+
+
+def upload_bytes(drive_id: str, dest_path: str, content: bytes, content_type: str = "text/csv") -> dict:
+    """
+    Upload bytes to OneDrive/SharePoint to a given path.
+    Good for generated CSV content.
+    """
+    token = acquire_token()
+    r = requests.put(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{dest_path}:/content",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": content_type},
+        data=content,
+        timeout=120,
+    )
+    r.raise_for_status()
+    return r.json()
+       
+
 def download_file(drive_id: str, path: str) -> bytes | None:
     #Download raw file content from OneDrive/SharePoint.
     token = acquire_token()

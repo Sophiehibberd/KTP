@@ -9,10 +9,13 @@ import hashlib
 import pandas as pd
 import io
 import matplotlib.pyplot as plt
+import datetime as dt
+import tempfile
 
 from shiny.express import ui, render, input
 from shiny import reactive, App
 from shiny import ui as U
+from graph_mail import send_results_email
 
 from accounts import (
     create_account,
@@ -25,7 +28,8 @@ from activation_context import set_user_email, get_user_email
 from one_drive import (
     ensure_folder, upload_small_file, append_audit_log_csv,
     list_children, create_view_link, update_product_key, read_json,
-    download_file,  # needed to fetch uploaded CSVs
+    download_file, 
+    upload_bytes,  
 )
 
 import decision_logic
@@ -75,14 +79,14 @@ def decision_rules():
 # ---------- NAVIGATION & SECURITY ----------
 def _protect_tabs_initial():
     ui.update_nav_panel("main_nav", target="Training", method="hide")
-    ui.update_nav_panel("main_nav", target="Upload", method="hide")
+    #ui.update_nav_panel("main_nav", target="Upload", method="hide")
     ui.update_nav_panel("main_nav", target="Decision Tool", method="hide")
     ui.update_nav_panel("main_nav", target="My results", method="hide")
     ui.update_navset("main_nav", selected="Activation")
 
 def _unlock_tabs_and_go(default="Training"):
     ui.update_nav_panel("main_nav", target="Training", method="show")
-    ui.update_nav_panel("main_nav", target="Upload", method="show")
+    #ui.update_nav_panel("main_nav", target="Upload", method="show")
     ui.update_nav_panel("main_nav", target="Decision Tool", method="show")
     ui.update_nav_panel("main_nav", target="My results", method="show")
     ui.update_nav_panel("main_nav", target="Activation", method="hide")
@@ -227,111 +231,127 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
 
 
     # ===== UPLOAD =====
-    with ui.nav_panel("Upload", value="Upload"):
-        ui.h3("Test Results Upload")
+    #with ui.nav_panel("Upload", value="Upload"):
+        #ui.h3("Test Results Upload")
 
-        ui.input_file("tbl", "Upload CSV (Document must be in CSV format and contain 6 columns)", accept=[".csv"], multiple=False)
+        #ui.input_file("tbl", "Upload CSV (Document must be in CSV format and contain 6 columns)", accept=[".csv"], multiple=False)
         
 
-        @render.download(filename=lambda: f"template_{time.strftime('%Y%m%d')}.csv", label="Download CSV Template")
-        def dl_template():
-            try:
-                b = download_file(DRIVE_ID, "NBFKTPAPP/Admin/upload_template.csv")
-                if not b:
+        #@render.download(filename=lambda: f"template_{time.strftime('%Y%m%d')}.csv", label="Download CSV Template")
+        #def dl_template():
+            #try:
+                #b = download_file(DRIVE_ID, "NBFKTPAPP/Admin/upload_template.csv")
+                #if not b:
                     #fallback to generated template if OneDrive read fails
-                    cols = EXPECTED_COLUMNS or [f"col{i}" for i in range(1, 14)]
-                    df = pd.DataFrame(columns=cols)
-                    s = io.StringIO()
-                    df.to_csv(s, index=False)
-                    yield s.getvalue().encode("utf-8")
-                    return
-                yield b
-            except Exception as ex:
-                print("TEMPLATE DOWNLOAD ERROR:", ex)
+                    #cols = EXPECTED_COLUMNS or [f"col{i}" for i in range(1, 14)]
+                    #df = pd.DataFrame(columns=cols)
+                    #s = io.StringIO()
+                    #df.to_csv(s, index=False)
+                    #yield s.getvalue().encode("utf-8")
+                    #return
+                #yield b
+            #except Exception as ex:
+                #print("TEMPLATE DOWNLOAD ERROR:", ex)
                 #fallback to generated template
-                cols = EXPECTED_COLUMNS or [f"col{i}" for i in range(1, 14)]
-                df = pd.DataFrame(columns=cols)
-                s = io.StringIO()
-                df.to_csv(s, index=False)
-                yield s.getvalue().encode("utf-8")
+                #cols = EXPECTED_COLUMNS or [f"col{i}" for i in range(1, 14)]
+                #df = pd.DataFrame(columns=cols)
+                #s = io.StringIO()
+                #df.to_csv(s, index=False)
+                #yield s.getvalue().encode("utf-8")
 
-        @reactive.calc
-        def parsed_df():
-            f = input.tbl()
-            if not f:
-                return pd.DataFrame()
-            try:
-                return pd.read_csv(f[0]["datapath"])
-            except:
-                return pd.DataFrame()
+        #@reactive.calc
+        #def parsed_df():
+            #f = input.tbl()
+            #if not f:
+                #return pd.DataFrame()
+            #try:
+                #return pd.read_csv(f[0]["datapath"])
+            #except:
+                #return pd.DataFrame()
 
-        @render.text
-        def validation_msg():
-            email = get_user_email()
-            if not email:
-                return "⚠️ Please sign in first."
-            df = parsed_df()
-            if df.empty:
-                return "Awaiting upload…"
-            if df.shape[1] != 6:
-                return f"❌ Expected 6 columns, got {df.shape[1]}."
-            if df.shape[0] < 1:
-                return "❌ No data rows."
-            return f"✅ {df.shape[0]} rows × 6 columns."
+        #@render.text
+        #def validation_msg():
+            #email = get_user_email()
+            #if not email:
+                #return "⚠️ Please sign in first."
+            #df = parsed_df()
+            #if df.empty:
+                #return "Awaiting upload…"
+            #if df.shape[1] != 6:
+                #return f"❌ Expected 6 columns, got {df.shape[1]}."
+            #if df.shape[0] < 1:
+                #return "❌ No data rows."
+            #return f"✅ {df.shape[0]} rows × 6 columns."
 
-        @render.data_frame
-        def preview_df():
-            df = parsed_df()
-            return df.head(25) if not df.empty else pd.DataFrame({"Status": ["No preview available"]})
+        #@render.data_frame
+        #def preview_df():
+            #df = parsed_df()
+            #return df.head(25) if not df.empty else pd.DataFrame({"Status": ["No preview available"]})
 
-        ui.input_action_button("confirm", "Confirm Upload")
+        #ui.input_action_button("confirm", "Confirm Upload")
 
-        @render.text
-        @reactive.event(input.confirm)
-        def upload_status():
-            email = get_user_email()
-            if not email:
-                return "You must sign in first."
+        #@render.text
+        #@reactive.event(input.confirm)
+        #def upload_status():
+           # email = get_user_email()
+           # if not email:
+               # return "You must sign in first."
 
-            f = input.tbl()
-            df = parsed_df()
-            if not f or df.empty:
-                return "Upload not attempted."
+           # f = input.tbl()
+           # df = parsed_df()
+           # if not f or df.empty:
+                #return "Upload not attempted."
 
-            if df.shape[1] != 6:
-                return "Invalid column count."
+            #if df.shape[1] != 6:
+               # return "Invalid column count."
 
-            ts = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"upload_{ts}.csv"
-            dest_dir = user_upload_dir(email)
-            dest_path = f"{dest_dir}/{filename}"
+            #ts = time.strftime("%Y%m%d_%H%M%S")
+            #filename = f"upload_{ts}.csv"
+            #dest_dir = user_upload_dir(email)
+            #dest_path = f"{dest_dir}/{filename}"
 
-            sha256 = _sha256_file(f[0]["datapath"])
+            #sha256 = _sha256_file(f[0]["datapath"])
 
-            try:
-                ensure_folder(DRIVE_ID, dest_dir)
-                upload_small_file(DRIVE_ID, dest_path, f[0]["datapath"])
+            #try:
+                #ensure_folder(DRIVE_ID, dest_dir)
+                #upload_small_file(DRIVE_ID, dest_path, f[0]["datapath"])
 
-                ensure_folder(DRIVE_ID, user_log_dir(email))
-                append_audit_log_csv(
-                    DRIVE_ID, f"{user_log_dir(email)}/audit.csv",
-                    {
-                        "timestamp": ts, "user_id": email, "filename": filename,
-                        "rows": df.shape[0], "columns": 6,
-                        "sha256": sha256, "drive_path": dest_path,
-                        "result": "success"
-                    }
-                )
+                #ensure_folder(DRIVE_ID, user_log_dir(email))
+                #append_audit_log_csv(
+                    #DRIVE_ID, f"{user_log_dir(email)}/audit.csv",
+                   # {
+                  #      "timestamp": ts, "user_id": email, "filename": filename,
+                  #      "rows": df.shape[0], "columns": 6,
+                  #      "sha256": sha256, "drive_path": dest_path,
+                  #      "result": "success"
+#}
+              #  )
 
-                return f"✅ Uploaded: {filename}"
+             #   return f"✅ Uploaded: {filename}"
 
-            except Exception as ex:
-                return f"Upload failed: {ex}"
+          #  except Exception as ex:
+           #     return f"Upload failed: {ex}"
 
 
     # ===== DECISION TOOL =====
     with ui.nav_panel("Decision Tool", value="Decision Tool"):
         ui.h3("Decision Tree Calculator")
+
+        ui.hr()
+        ui.h4("Enter and collect results")
+
+        ui.input_text("material_name", "Material name", placeholder="e.g. Sample A / Product XYZ")
+
+        # Shiny for Python date input:
+        ui.input_date("test_date", "Date of test", value=dt.date.today())
+
+        ui.input_action_button("enter_result", "Enter")
+        ui.input_action_button("results_completed", "Results completed")
+        ui.output_text("entry_status")
+
+        ui.hr()
+        ui.h4("Results entered this session")
+        ui.output_data_frame("entered_results_table")
 
         ui.input_radio_buttons(
             "material_type",
@@ -372,6 +392,144 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
                 style="margin-top: 1rem;",
             )
 
+        # Put this inside the Decision Tool panel code (same scope as other reactive funcs)
+
+        entered_results = reactive.Value(pd.DataFrame(columns=[
+            "material_name",
+            "test_date",
+            "material_type",
+            "EB",
+            "YM",
+            "RAC",
+            "decision_result",
+            "decision_explanation",
+            "entered_at",
+        ]))
+
+        @render.text
+        def entry_status():
+            # default blank
+            return ""
+
+        @reactive.effect
+        @reactive.event(input.enter_result)
+        def _on_enter_result():
+            email = get_user_email()
+            if not email:
+                ui.notification_show("Please sign in first.", type="error")
+                return
+
+            name = (input.material_name() or "").strip()
+            if not name:
+                ui.notification_show("Please enter a material name.", type="error")
+                return
+
+            # date comes back as datetime.date
+            test_date = input.test_date()
+            if not test_date:
+                ui.notification_show("Please select the test date.", type="error")
+                return
+
+            try:
+                eb = float(input.num_eb())
+                ym = float(input.num_ym())
+                rac = float(input.num_rac())
+            except Exception:
+                ui.notification_show("Please enter valid numbers for EB/YM/RAC.", type="error")
+                return
+
+            rules = decision_rules()
+            result, explanation = decision_logic.evaluate_triplet([eb, ym, rac], rules)
+
+            df = entered_results.get()
+            new_row = pd.DataFrame([{
+                "material_name": name,
+                "test_date": str(test_date),               # store as ISO string for CSV consistency
+                "material_type": input.material_type(),
+                "EB": eb,
+                "YM": ym,
+                "RAC": rac,
+                "decision_result": str(result),            # Red/Amber/Green
+                "decision_explanation": str(explanation),  # optional but useful
+                "entered_at": dt.datetime.now().isoformat(timespec="seconds"),
+            }])
+
+            entered_results.set(pd.concat([df, new_row], ignore_index=True))
+
+            # Optional: reset inputs after entry
+            ui.update_text("material_name", value="")
+            ui.update_numeric("num_eb", value=0)
+            ui.update_numeric("num_ym", value=0)
+            ui.update_numeric("num_rac", value=0)
+
+        @render.data_frame
+        def entered_results_table():
+            df = entered_results.get()
+            if df.empty:
+                return pd.DataFrame({"Status": ["No rows entered yet."]})
+            # show a friendly subset first
+            cols = ["material_name", "test_date", "material_type", "EB", "YM", "RAC", "decision_result"]
+            return df[cols]
+
+        @reactive.effect
+        @reactive.event(input.results_completed)
+        def _on_results_completed():
+            email = get_user_email()
+            if not email:
+                ui.notification_show("Please sign in first.", type="error")
+                return
+
+            df = entered_results.get()
+            if df.empty:
+                ui.notification_show("No results to submit.", type="error")
+                return
+
+            # --- Upload to OneDrive (so My results page continues to work) ---
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"decisiontool_{ts}.csv"
+            dest_dir = user_upload_dir(email)
+            dest_path = f"{dest_dir}/{filename}"
+
+            # Convert to CSV bytes
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
+
+            try:
+                ensure_folder(DRIVE_ID, dest_dir)
+                upload_bytes(DRIVE_ID, dest_path, csv_bytes, content_type="text/csv")
+            except Exception as ex:
+                ui.notification_show(f"Upload to OneDrive failed: {ex}", type="error")
+                return
+
+            # --- Email summary via Graph ---
+            try:
+                # You can switch this to HTML template later; for now simple summary
+                subject = "Your test results summary"
+                body_text = (
+                    f"Hello,\n\n"
+                    f"Your results have been submitted.\n\n"
+                    f"Uploaded file: {filename}\n"
+                    f"Number of rows: {len(df)}\n\n"
+                    f"Summary (first 50 rows):\n"
+                    f"{df[['material_name','test_date','decision_result']].head(50).to_string(index=False)}\n"
+                )
+
+                send_results_email(
+                    to_email=email,
+                    subject=subject,
+                    body_text=body_text,
+                    # Optional: attach the CSV they submitted
+                    attachments=[(filename, "text/csv", csv_bytes)],
+                )
+            except Exception as ex:
+                ui.notification_show(f"Email failed: {ex}", type="error")
+                # Decide: you might still want to clear table or not. You asked to clear after sending/email+upload,
+                # so only clear if email succeeded. Since it failed, return without clearing.
+                return
+
+            # --- Clear the session table after success ---
+            entered_results.set(entered_results.get().iloc[0:0].copy())
+
+            ui.notification_show("Results submitted: uploaded and emailed.", type="message")
 
     # ===== MY RESULTS =====
     with ui.nav_panel("My results", value="My results"):
