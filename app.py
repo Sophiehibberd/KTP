@@ -351,7 +351,17 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
 
         ui.hr()
         ui.h4("Results entered this session")
-        ui.output_data_frame("entered_results_table")
+
+        @render.data_frame
+        def entered_results_table():
+            df = entered_results.get()
+            if df.empty:
+                return pd.DataFrame({"Status": ["No rows entered yet."]})
+            # show a friendly subset first
+            cols = ["material_name", "test_date", "material_type", "EB", "YM", "RAC", "decision_result"]
+            cols = [c for c in cols if c in df.columns]
+            return df[cols]
+        
 
         ui.input_radio_buttons(
             "material_type",
@@ -459,14 +469,7 @@ with ui.navset_bar(title="'New Name of Test Here' App", id="main_nav"):
             ui.update_numeric("num_ym", value=0)
             ui.update_numeric("num_rac", value=0)
 
-        @render.data_frame
-        def entered_results_table():
-            df = entered_results.get()
-            if df.empty:
-                return pd.DataFrame({"Status": ["No rows entered yet."]})
-            # show a friendly subset first
-            cols = ["material_name", "test_date", "material_type", "EB", "YM", "RAC", "decision_result"]
-            return df[cols]
+        
 
         @reactive.effect
         @reactive.event(input.results_completed)
